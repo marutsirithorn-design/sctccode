@@ -1,0 +1,1149 @@
+<!-- 
+  ==========================================
+  SCTC Planning System - UI Version 5.3 (Plan Status Added)
+  ==========================================
+-->
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบแผนงาน SCTC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; }
+    .swal2-title, .swal2-content, .swal2-input { font-family: 'Prompt', sans-serif !important; }
+    .loader { border-top-color: #3b82f6; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+    @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+    .card-details {
+      transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease;
+      max-height: 0; opacity: 0; overflow: hidden; padding-top: 0; padding-bottom: 0;
+    }
+    .card-details.open { max-height: 2000px; opacity: 1; padding-top: 1rem; padding-bottom: 1rem; }
+  </style>
+</head>
+
+<body class="text-gray-800 h-screen overflow-hidden flex flex-col">
+  <div id="loadingOverlay" class="fixed inset-0 bg-white bg-opacity-80 z-50 flex flex-col items-center justify-center hidden">
+    <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-16 w-16 mb-4"></div>
+    <h2 class="text-xl font-semibold text-gray-700">กำลังประมวลผล...</h2>
+  </div>
+
+  <div id="loginScreen" class="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 p-4 absolute inset-0 z-40">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div class="text-center mb-8">
+        <i class="fas fa-chart-line text-5xl text-blue-500 mb-3"></i>
+        <h4 class="text-3xl font-bold text-gray-800">SCTC Planning V.5.3</h4>
+        <p class="text-gray-500 mt-2">เข้าสู่ระบบเพื่อจัดการแผนงาน</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">ฝ่าย (Username)</label>
+          <select id="username" class="w-full px-4 py-3 rounded-lg bg-gray-100 border focus:border-blue-500 focus:bg-white focus:outline-none" required>
+            <option value="">-- กำลังโหลดข้อมูล... --</option>
+          </select>
+        </div>
+        <div class="mb-6">
+          <label class="block text-gray-700 text-sm font-bold mb-2">รหัส (Password)</label>
+          <input type="password" id="password" class="w-full px-4 py-3 rounded-lg bg-gray-100 border focus:border-blue-500 focus:bg-white focus:outline-none" required placeholder="รหัสผ่าน">
+        </div>
+        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition duration-300">เข้าสู่ระบบ</button>
+      </form>
+      <div class="mt-4 text-xs text-gray-400 text-center">*พบปัญหาโปรดติดต่อ อ.มารุต ศิริธร</div>
+    </div>
+  </div>
+
+  <div id="appScreen" class="hidden flex-1 flex flex-col md:flex-row h-full overflow-hidden">
+    <aside class="bg-indigo-800 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-lg z-20">
+      <div class="p-4 bg-indigo-900 flex items-center justify-between md:justify-center">
+        <h2 class="text-xl font-bold"><i class="fas fa-project-diagram mr-2"></i> ระบบแผน SCTC</h2>
+        <button class="md:hidden text-white" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+      </div>
+      <div id="sidebarMenu" class="flex-1 overflow-y-auto py-4 hidden md:block">
+        <div class="px-4 mb-4 text-xs text-indigo-300 uppercase font-semibold tracking-wider">เมนูหลัก</div>
+        <a href="#" onclick="switchView('dashboard')" id="menu-dashboard" class="block px-4 py-3 hover:bg-indigo-700 transition"><i class="fas fa-tachometer-alt w-6"></i> ภาพรวม (Dashboard)</a>
+        <!-- เมนูใหม่ สถานะแผน -->
+        <a href="#" onclick="switchView('planStatus')" id="menu-planStatus" class="block px-4 py-3 hover:bg-indigo-700 transition text-sky-300"><i class="fas fa-tasks w-6"></i> สถานะแผน</a>
+        
+        <a href="#" onclick="switchView('plan')" id="menu-plan" class="block px-4 py-3 hover:bg-indigo-700 transition"><i class="fas fa-list-alt w-6"></i> แผนงาน (Plan)</a>
+        <a href="#" onclick="switchView('result')" id="menu-result" class="block px-4 py-3 hover:bg-indigo-700 transition"><i class="fas fa-chart-bar w-6"></i> ผลลัพธ์ (Result)</a>
+        
+        <!-- เมนูใหม่ สรุปการใช้งบประมาณ -->
+        <a href="#" onclick="switchView('budgetSummary')" id="menu-budgetSummary" class="block px-4 py-3 hover:bg-indigo-700 transition text-amber-300"><i class="fas fa-wallet w-6"></i> สรุปการใช้งบประมาณ</a>
+        
+        <div id="specialMenu" class="hidden border-t border-indigo-700 mt-4 pt-4">
+          <div class="px-4 mb-4 text-xs text-indigo-300 uppercase font-semibold tracking-wider">จัดการงบประมาณ</div>
+          <a href="#" onclick="switchView('budgetReq')" id="menu-budgetReq" class="hidden px-4 py-3 hover:bg-indigo-700 text-yellow-300 transition"><i class="fas fa-hand-holding-usd w-6"></i> สำหรับเจ้าหน้าที่แผน</a>
+          <a href="#" onclick="switchView('budgetAct')" id="menu-budgetAct" class="hidden px-4 py-3 hover:bg-indigo-700 text-green-300 transition"><i class="fas fa-money-check-alt w-6"></i> เจ้าหน้าที่การเงิน</a>
+          
+          <div class="px-4 mb-4 mt-4 text-xs text-indigo-300 uppercase font-semibold tracking-wider">ตรวจสอบผลลัพธ์</div>
+          <a href="#" onclick="switchView('checkResult')" id="menu-checkResult" class="hidden px-4 py-3 hover:bg-indigo-700 text-blue-300 transition"><i class="fas fa-file-signature w-6"></i> ตรวจสอบการส่งผล</a>
+          <a href="#" onclick="switchView('historyResult')" id="menu-historyResult" class="hidden px-4 py-3 hover:bg-indigo-700 text-purple-300 transition"><i class="fas fa-history w-6"></i> เอกสารที่รับแล้ว</a>
+        </div>
+      </div>
+      <div class="p-4 bg-indigo-900 border-t border-indigo-700">
+        <div class="text-sm mb-2 text-indigo-200">เข้าสู่ระบบโดย:</div>
+        <div class="font-semibold mb-3 truncate" id="displayUser">User</div>
+        <button onclick="logout()" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded transition text-sm"><i class="fas fa-sign-out-alt"></i> ออกจากระบบ</button>
+      </div>
+    </aside>
+
+    <main class="flex-1 bg-gray-100 flex flex-col h-full overflow-hidden">
+      <header class="bg-white shadow-sm p-4 flex justify-between items-center z-10">
+        <h2 class="text-xl md:text-2xl font-semibold text-gray-800" id="pageTitle">ภาพรวม (Dashboard)</h2>
+        <button onclick="openModal()" id="btnAdd" class="hidden bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow transition flex items-center">
+          <i class="fas fa-plus md:mr-2"></i> <span class="hidden md:inline" id="btnAddText">เพิ่มข้อมูล</span>
+        </button>
+      </header>
+      
+      <div id="subTabMenu" class="hidden bg-white border-b px-4 flex gap-4 text-sm font-medium text-gray-500">
+        <button onclick="switchSubTab('pending')" id="tab-pending" class="py-3 border-b-2 border-transparent hover:text-blue-600 transition">
+          <i class="fas fa-hourglass-half mr-1"></i> รอการป้อนข้อมูล
+        </button>
+        <button onclick="switchSubTab('completed')" id="tab-completed" class="py-3 border-b-2 border-transparent hover:text-blue-600 transition">
+          <i class="fas fa-check-circle mr-1"></i> ป้อนข้อมูลเสร็จแล้ว
+        </button>
+        <button onclick="switchSubTab('all')" id="tab-all" class="py-3 border-b-2 border-blue-600 text-blue-600 transition">
+          <i class="fas fa-list mr-1"></i> แสดงทั้งหมด
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-auto p-4 md:p-6">
+        <div id="dataContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-10"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="crudModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-full flex flex-col">
+      <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
+        <h3 class="text-xl font-semibold" id="modalTitle">จัดการข้อมูล</h3>
+        <button onclick="closeModal()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
+      </div>
+      <div class="p-6 overflow-y-auto flex-1">
+        <form id="crudForm" class="grid grid-cols-1 md:grid-cols-2 gap-4"></form>
+      </div>
+      <div class="px-6 py-4 border-t bg-gray-50 rounded-b-xl flex justify-end gap-3">
+        <button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-gray-800 transition">ยกเลิก</button>
+        <button type="button" onclick="saveFormData()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded text-white shadow transition"><i class="fas fa-save mr-1"></i> บันทึกข้อมูล</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null, currentView = 'dashboard', tableData = [], editingRow = null;
+    let currentSubTab = 'all'; 
+    
+    const COLUMNS = {
+      plan: ['รหัส', 'รายการ', 'วัตถุประสงค์', 'เป้าหมาย', 'ผลลัพธ์', 'สถานที่', 'ระยะเวลา', 'รายรับ', 'งบประมาณ', 'การประเมินผล', 'ผู้รับผิดชอบ', 'มาตรฐานที่', 'ตัวชี้วัดที่', 'ภารกิจที่'],
+      result: ['รหัส', 'รายการ', 'ผู้รับผิดชอบ', 'เป้าหมาย', 'จำนวนเต็มของเป้าหมาย', 'ผลลัพธ์จริงเชิงปริมาณ', 'จำนวนเต็ม', 'ร้อยละ', 'บรรลุผล', 'ผลการดำเนินงาน', 'สถานะ', 'งบประมาณ', 'งบประมาณที่ใช้', 'มาตรฐานที่', 'ตัวชี้วัดที่', 'ภารกิจที่', 'ลิงก์'],
+      budgetReq: ['ID', 'รหัสแผน', 'รายการ', 'งบประมาณหลัก', 'จำนวนเงินที่ขอ', 'งบประมาณคงเหลือ', 'วันที่บันทึก'],
+      budgetAct: ['ID', 'รหัสแผน', 'รายการ', 'งบประมาณหลัก', 'จำนวนเงินที่ขอ', 'งบประมาณใช้จริง', 'งบประมาณคงเหลือ', 'วันที่บันทึก']
+    };
+
+    function showLoading(msg = 'กำลังประมวลผล...') { Swal.fire({ title: msg, allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() }); }
+    function hideLoading() { Swal.close(); }
+    function toggleSidebar() { document.getElementById('sidebarMenu').classList.toggle('hidden'); }
+    function formatNumber(n) { return (parseFloat(n.toString().replace(/,/g, '')) || 0).toLocaleString('th-TH', {minimumFractionDigits: 2}); }
+
+    function handleServerError(err) {
+        hideLoading();
+        Swal.fire('พบข้อผิดพลาด', err.message || 'ไม่สามารถโหลดข้อมูลจาก Google Sheet ได้', 'error');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      showLoading('กำลังโหลดรายชื่อผู้ใช้งาน...');
+      google.script.run
+      .withFailureHandler(handleServerError)
+      .withSuccessHandler(res => {
+        let loginOptions = '<option value="">-- เลือกผู้ใช้งาน --</option><option value="admin">Admin</option><option value="เจ้าหน้าที่แผน">เจ้าหน้าที่แผน</option><option value="เจ้าหน้าที่การเงิน">เจ้าหน้าที่การเงิน</option>';
+        let filterOptions = '';
+        
+        if (Array.isArray(res)) {
+            res.forEach(d => {
+              let name = '', code = '';
+              if (d && typeof d === 'object' && !Array.isArray(d)) {
+                  name = d.name; code = d.code || d.name;
+              } else if (Array.isArray(d)) {
+                  name = d[0]; code = d[1] || d[0];
+              } else {
+                  name = d; code = d;
+              }
+              if (name && String(name).trim() !== '' && String(name) !== 'undefined') {
+                loginOptions += `<option value="${name}">${name}</option>`;
+                filterOptions += `<option value="${code}">${name}</option>`;
+              }
+            });
+        }
+        document.getElementById('username').innerHTML = loginOptions;
+        window.departmentOptionsHtml = filterOptions; 
+        hideLoading();
+      }).getDepartments();
+    });
+
+    function handleLogin(e) {
+      e.preventDefault();
+      showLoading('กำลังเข้าสู่ระบบ...');
+      google.script.run
+      .withFailureHandler(handleServerError)
+      .withSuccessHandler(res => {
+        if (res.status === 'success') {
+          currentUser = res;
+          document.getElementById('loginScreen').classList.add('hidden');
+          document.getElementById('appScreen').classList.remove('hidden');
+          document.getElementById('displayUser').innerText = res.deptName;
+          
+          if(['admin','plan_officer','finance_officer'].includes(res.role)) {
+            document.getElementById('specialMenu').classList.remove('hidden');
+            if(res.role === 'admin' || res.role === 'plan_officer') {
+              document.getElementById('menu-budgetReq').classList.remove('hidden');
+              document.getElementById('menu-budgetReq').classList.add('block');
+              
+              const checkMenu = document.getElementById('menu-checkResult');
+              const historyMenu = document.getElementById('menu-historyResult');
+              if(checkMenu) checkMenu.classList.replace('hidden', 'block');
+              if(historyMenu) historyMenu.classList.replace('hidden', 'block');
+            }
+            if(res.role === 'admin' || res.role === 'finance_officer') {
+              document.getElementById('menu-budgetAct').classList.remove('hidden');
+              document.getElementById('menu-budgetAct').classList.add('block');
+            }
+          }
+          
+          switchView('dashboard');
+          Swal.fire({ icon: 'success', title: 'เข้าสู่ระบบสำเร็จ', timer: 1000, showConfirmButton: false });
+        } else {
+          Swal.fire('Error', res.message, 'error');
+        }
+      }).authenticate(document.getElementById('username').value, document.getElementById('password').value);
+    }
+
+    function switchView(v) {
+      if(v === 'budgetReq' && !['plan_officer', 'admin'].includes(currentUser.role)) {
+          Swal.fire('ปฏิเสธ', 'เฉพาะเจ้าหน้าที่แผนหรือ Admin เท่านั้น', 'warning'); return;
+      }
+      if(v === 'budgetAct' && !['finance_officer', 'admin'].includes(currentUser.role)) {
+          Swal.fire('ปฏิเสธ', 'เฉพาะเจ้าหน้าที่การเงินหรือ Admin เท่านั้น', 'warning'); return;
+      }
+      if((v === 'checkResult' || v === 'historyResult') && !['plan_officer', 'admin'].includes(currentUser.role)) {
+          Swal.fire('ปฏิเสธ', 'เฉพาะเจ้าหน้าที่แผนหรือ Admin เท่านั้น', 'warning'); return;
+      }
+
+      if (currentView !== v) {
+          window.lastSelectedDataDept = ''; 
+          window.lastSelectedPlanStatus = 'ALL';
+          window.lastSearchTerm = '';
+          document.getElementById('dataContainer').innerHTML = '';
+          currentSubTab = ['budgetReq', 'budgetAct'].includes(v) ? 'pending' : 'all';
+      }
+
+      currentView = v;
+      document.querySelectorAll('#sidebarMenu a').forEach(el => el.classList.remove('bg-indigo-900'));
+      const el = document.getElementById(`menu-${v}`);
+      if(el) el.classList.add('bg-indigo-900');
+      
+      const titles = { dashboard: 'ภาพรวมระบบ (Dashboard)', plan: 'ข้อมูลแผนงาน (Plan)', result: 'ผลการดำเนินงาน (Result)', budgetReq: 'สำหรับเจ้าหน้าที่แผน', budgetAct: 'เจ้าหน้าที่การเงิน', checkResult: 'ตรวจสอบการส่งผล', historyResult: 'เอกสารที่รับแล้ว', planStatus: 'สถานะแผน', budgetSummary: 'สรุปการใช้งบประมาณ' };
+      document.getElementById('pageTitle').innerText = titles[v] || 'ระบบแผนงาน';
+
+      let isOfficer = currentUser.role === 'plan_officer' || currentUser.role === 'finance_officer';
+      let isAdmin = currentUser.role === 'admin';
+      
+      if (v === 'dashboard' || v === 'checkResult' || v === 'historyResult' || v === 'planStatus' || v === 'budgetSummary') {
+          document.getElementById('btnAdd').classList.add('hidden');
+      } else if ((v === 'plan' || v === 'result') && isOfficer) {
+          document.getElementById('btnAdd').classList.add('hidden');
+      } else if (v === 'budgetAct') {
+          document.getElementById('btnAdd').classList.add('hidden');
+      } else {
+          document.getElementById('btnAdd').classList.remove('hidden');
+          document.getElementById('btnAddText').innerText = v === 'budgetReq' ? 'ขอใช้เงินตามแผน' : 'เพิ่มข้อมูล';
+      }
+
+      const subTabMenu = document.getElementById('subTabMenu');
+      if (isAdmin || isOfficer) {
+          if (v === 'result' || v === 'budgetAct' || v === 'budgetReq') {
+              subTabMenu.classList.remove('hidden');
+              updateSubTabUI();
+          } else {
+              subTabMenu.classList.add('hidden');
+          }
+      } else {
+          subTabMenu.classList.add('hidden');
+      }
+
+      if(window.innerWidth < 768) document.getElementById('sidebarMenu').classList.add('hidden');
+      loadData();
+    }
+
+    function switchSubTab(tab) {
+        currentSubTab = tab;
+        updateSubTabUI();
+        renderCards(tableData);
+    }
+
+    function updateSubTabUI() {
+        const tabs = ['pending', 'completed', 'all'];
+        tabs.forEach(t => {
+            const el = document.getElementById(`tab-${t}`);
+            if (el) {
+                if (t === currentSubTab) {
+                    el.classList.replace('border-transparent', 'border-blue-600');
+                    el.classList.replace('text-gray-500', 'text-blue-600');
+                } else {
+                    el.classList.replace('border-blue-600', 'border-transparent');
+                    el.classList.replace('text-blue-600', 'text-gray-500');
+                }
+            }
+        });
+    }
+
+    function loadData() {
+      showLoading('กำลังโหลดข้อมูล...');
+      
+      if (currentView === 'dashboard') {
+        let filterDept = currentUser.role === 'user' ? currentUser.deptCode : (document.getElementById('dashboardDeptFilter')?.value || window.lastSelectedDept || 'ALL');
+        window.lastSelectedDept = filterDept;
+        let filterPlan = document.getElementById('dashboardPlanFilter')?.value || window.lastSelectedPlan || 'ALL';
+        window.lastSelectedPlan = filterPlan;
+
+        google.script.run
+        .withFailureHandler(handleServerError)
+        .withSuccessHandler(res => { 
+            if(!res) { handleServerError({message: 'ไม่พบข้อมูล Dashboard'}); return; }
+            renderDashboard(res); hideLoading(); 
+        }).getOutcomeDashboard(filterDept, filterPlan);
+
+      } else if (currentView === 'planStatus') {
+        // Load data specifically for the new Plan Status view
+        let filterDept = currentUser.role === 'user' ? currentUser.deptCode : (document.getElementById('dataDeptFilter')?.value || window.lastSelectedDataDept || 'ALL');
+        window.lastSelectedDataDept = filterDept;
+
+        if (currentUser.role !== 'user' && filterDept === '') {
+            tableData = [];
+            renderPlanStatusTable([]);
+            hideLoading();
+            return;
+        }
+
+        google.script.run
+        .withFailureHandler(handleServerError)
+        .withSuccessHandler(res => {
+            tableData = res || [];
+            renderPlanStatusTable(tableData);
+            hideLoading();
+        }).getPlanStatus(currentUser.role, filterDept);
+
+      } else if (currentView === 'budgetSummary') {
+        let filterDept = currentUser.role === 'user' ? currentUser.deptCode : (document.getElementById('dataDeptFilter')?.value || window.lastSelectedDataDept || 'ALL');
+        window.lastSelectedDataDept = filterDept;
+
+        if (currentUser.role !== 'user' && filterDept === '') {
+            tableData = [];
+            renderBudgetSummaryTable([]);
+            hideLoading();
+            return;
+        }
+
+        google.script.run
+        .withFailureHandler(handleServerError)
+        .withSuccessHandler(res => {
+            tableData = res || [];
+            renderBudgetSummaryTable(tableData);
+            hideLoading();
+        }).getBudgetSummary(currentUser.role, filterDept);
+
+      } else {
+        let filterDept = currentUser.deptCode;
+        if (currentUser.role !== 'user' && ['plan', 'result', 'checkResult', 'historyResult'].includes(currentView)) {
+            filterDept = document.getElementById('dataDeptFilter')?.value || window.lastSelectedDataDept || '';
+            window.lastSelectedDataDept = filterDept;
+        } else if (currentUser.role !== 'user') {
+            filterDept = 'ALL'; 
+        }
+
+        if (currentUser.role !== 'user' && ['plan', 'result', 'checkResult', 'historyResult'].includes(currentView) && filterDept === '') {
+            tableData = [];
+            if (currentView === 'checkResult' || currentView === 'historyResult') renderResultTable([]);
+            else renderCards([]);
+            hideLoading();
+            return;
+        }
+
+        let targetSheet = currentView === 'plan' ? 'Plan' : 'Result';
+        
+        if (currentView.startsWith('budget')) {
+            let argType = currentView === 'budgetReq' ? 'req' : 'act';
+            google.script.run
+            .withFailureHandler(handleServerError)
+            .withSuccessHandler(res => { 
+                tableData = res || []; 
+                renderCards(tableData); 
+                hideLoading(); 
+            }).getBudgetHistory(argType);
+        } else {
+            google.script.run
+            .withFailureHandler(handleServerError)
+            .withSuccessHandler(res => { 
+                tableData = res || []; 
+                if (currentView === 'checkResult' || currentView === 'historyResult') {
+                    renderResultTable(tableData, currentView === 'historyResult');
+                } else {
+                    renderCards(tableData); 
+                }
+                hideLoading(); 
+            }).fetchData(targetSheet, currentUser.role, filterDept);
+        }
+      }
+    }
+
+    function renderDashboard(data) {
+      const container = document.getElementById('dataContainer');
+      let filterHtml = '';
+      
+      let planOptionsHtml = '<option value="ALL">รวมทุกแผนงาน (All Plans)</option>';
+      if(data.planOptions) data.planOptions.forEach(p => planOptionsHtml += `<option value="${p.id}">${p.id} : ${p.name}</option>`);
+
+      if(currentUser.role !== 'user') {
+         filterHtml = `
+         <div class="col-span-full mb-4 p-4 bg-white rounded-xl shadow-sm flex flex-col md:flex-row gap-4 items-center">
+            <div class="flex items-center flex-1 w-full">
+                <label class="mr-3 font-bold text-gray-700 whitespace-nowrap">เลือกฝ่าย:</label>
+                <select id="dashboardDeptFilter" onchange="window.lastSelectedPlan='ALL'; loadData();" class="border p-2 rounded-lg w-full focus:outline-blue-500">
+                   <option value="ALL">รวมทั้งหมด (All Departments)</option>
+                   ${window.departmentOptionsHtml}
+                </select>
+            </div>
+            <div class="flex items-center flex-1 w-full">
+                <label class="mr-3 font-bold text-gray-700 whitespace-nowrap">เลือกแผนงาน:</label>
+                <select id="dashboardPlanFilter" onchange="loadData()" class="border p-2 rounded-lg w-full focus:outline-blue-500">${planOptionsHtml}</select>
+            </div>
+         </div>`;
+      } else {
+         filterHtml = `
+         <div class="col-span-full mb-4 p-4 bg-white rounded-xl shadow-sm flex items-center">
+            <div class="flex items-center flex-1 w-full">
+                <label class="mr-3 font-bold text-gray-700 whitespace-nowrap">เลือกแผนงาน:</label>
+                <select id="dashboardPlanFilter" onchange="loadData()" class="border p-2 rounded-lg w-full focus:outline-blue-500">${planOptionsHtml}</select>
+            </div>
+         </div>`;
+      }
+
+      let html = filterHtml + `
+        <div class="col-span-full grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-500"><div class="text-xs text-gray-500 font-bold mb-1">จำนวนแผนที่แสดง</div><div class="text-2xl font-bold">${data.totalPlans} <span class="text-sm font-normal text-gray-500">แผน</span></div></div>
+          <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-indigo-500"><div class="text-xs text-gray-500 font-bold mb-1">งบประมาณทั้งหมด</div><div class="text-xl lg:text-2xl font-bold">${formatNumber(data.totalBudget)}</div></div>
+          <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-yellow-500"><div class="text-xs text-gray-500 font-bold mb-1">งบประมาณขอใช้</div><div class="text-xl lg:text-2xl font-bold text-yellow-600">${formatNumber(data.reqBudget)}</div></div>
+          <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-green-500"><div class="text-xs text-gray-500 font-bold mb-1">งบประมาณคงเหลือ</div><div class="text-xl lg:text-2xl font-bold text-green-600">${formatNumber(data.remBudget)}</div></div>
+        </div>
+        <div class="col-span-full grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+               <div class="p-4 bg-gray-50 border-b font-bold text-gray-700"><i class="fas fa-list-ul mr-2 text-indigo-500"></i> ประเภทของแผน</div>
+               <ul class="divide-y divide-gray-100 p-4 max-h-64 overflow-y-auto">
+                  ${data.typeArr && data.typeArr.length ? data.typeArr.map(t => `<li class="py-2 flex justify-between text-sm md:text-base"><span>${t.name}</span><span class="font-bold text-indigo-600 px-3 py-1 bg-indigo-50 rounded-full">${t.count}</span></li>`).join('') : '<li class="text-center text-gray-400 py-4">ไม่มีข้อมูลประเภทแผน</li>'}
+               </ul>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+               <div class="p-4 bg-gray-50 border-b font-bold text-gray-700"><i class="fas fa-tasks mr-2 text-indigo-500"></i> สถานะการดำเนินงาน</div>
+               <div class="p-4 flex flex-col justify-center gap-3 h-full pb-10">
+                  <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-200"><div class="text-gray-600 font-bold"><i class="fas fa-circle mr-2 text-gray-400 text-sm"></i> ยังไม่ได้ดำเนินการ</div><div class="text-xl font-bold text-gray-700">${data.planStatusCount ? data.planStatusCount['ยังไม่ได้ดำเนินการ'] : 0}</div></div>
+                  <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg border border-blue-100"><div class="text-blue-700 font-bold"><i class="fas fa-spinner mr-2 text-blue-500 text-sm"></i> กำลังดำเนินการ</div><div class="text-xl font-bold text-blue-700">${data.planStatusCount ? data.planStatusCount['กำลังดำเนินการ'] : 0}</div></div>
+                  <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-100"><div class="text-green-700 font-bold"><i class="fas fa-check mr-2 text-green-500 text-sm"></i> ดำเนินการแล้ว</div><div class="text-xl font-bold text-green-700">${data.planStatusCount ? data.planStatusCount['ดำเนินการแล้ว'] : 0}</div></div>
+               </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+               <div class="p-4 bg-gray-50 border-b font-bold text-gray-700"><i class="fas fa-chart-pie mr-2 text-indigo-500"></i> สถานะความสำเร็จ</div>
+               <div class="p-4 flex flex-col justify-center gap-3 h-full pb-10">
+                  <div class="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-100"><div class="text-green-700 font-bold text-lg"><i class="fas fa-check-circle mr-2"></i> สำเร็จ</div><div class="text-2xl font-bold text-green-700">${data.statusCount ? data.statusCount['สำเร็จ'] : 0}</div></div>
+                  <div class="flex justify-between items-center p-4 bg-amber-50 rounded-lg border border-amber-100"><div class="text-amber-700 font-bold text-lg"><i class="fas fa-exclamation-circle mr-2"></i> ไม่สำเร็จ / ปรับปรุง</div><div class="text-2xl font-bold text-amber-700">${data.statusCount ? data.statusCount['ปรับปรุง'] : 0}</div></div>
+               </div>
+            </div>
+        </div>
+      `;
+      container.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-10';
+      container.innerHTML = html;
+
+      if(currentUser.role !== 'user' && window.lastSelectedDept) {
+          const filterDeptEl = document.getElementById('dashboardDeptFilter');
+          if(filterDeptEl) filterDeptEl.value = window.lastSelectedDept;
+      }
+      if(window.lastSelectedPlan) {
+          const filterPlanEl = document.getElementById('dashboardPlanFilter');
+          if(filterPlanEl && [...filterPlanEl.options].some(o => o.value === window.lastSelectedPlan)) {
+              filterPlanEl.value = window.lastSelectedPlan;
+          } else if(filterPlanEl) {
+              filterPlanEl.value = 'ALL'; window.lastSelectedPlan = 'ALL';
+          }
+      }
+    }
+
+    function renderCards(data) {
+      const container = document.getElementById('dataContainer');
+      let filterHtml = '';
+      let previousSearch = document.getElementById('searchInput') ? document.getElementById('searchInput').value : '';
+      let searchBoxHtml = `<div class="flex items-center flex-1 w-full"><label class="mr-3 font-bold text-gray-700 whitespace-nowrap"><i class="fas fa-search text-gray-400"></i> ค้นหา:</label><input type="text" id="searchInput" onkeyup="handleSearch()" value="${previousSearch}" placeholder="พิมพ์รหัสแผน หรือ รายการ..." class="border p-2 rounded-lg flex-1 focus:outline-blue-500"></div>`;
+      
+      if (currentUser.role !== 'user' && (currentView === 'plan' || currentView === 'result')) {
+         filterHtml = `<div class="col-span-full mb-4 p-4 bg-white rounded-xl shadow-sm flex flex-col md:flex-row gap-4 items-center"><div class="flex items-center flex-1 w-full"><label class="mr-3 font-bold text-gray-700 whitespace-nowrap">เลือกดูข้อมูลฝ่าย:</label><select id="dataDeptFilter" onchange="loadData()" class="border p-2 rounded-lg flex-1 focus:outline-blue-500"><option value="" disabled selected>-- กรุณาเลือกฝ่ายเพื่อแสดงข้อมูล --</option><option value="ALL">รวมทั้งหมด (All Departments)</option>${window.departmentOptionsHtml}</select></div>${searchBoxHtml}</div>`;
+      } else if (data.length > 0 || currentView.startsWith('budget')) {
+         filterHtml = `<div class="col-span-full mb-4 p-4 bg-white rounded-xl shadow-sm flex items-center">${searchBoxHtml}</div>`;
+      }
+
+      container.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-10';
+      
+      let isOfficer = currentUser.role === 'plan_officer' || currentUser.role === 'finance_officer';
+      let isAdmin = currentUser.role === 'admin';
+      let isUser = currentUser.role === 'user';
+      let emptyMsg = '<div class="col-span-full text-center p-10 text-gray-400">ไม่พบข้อมูลในระบบ</div>';
+      
+      if (currentUser.role !== 'user' && (currentView === 'plan' || currentView === 'result') && !window.lastSelectedDataDept) {
+          emptyMsg = '<div class="col-span-full text-center p-10 text-gray-500 font-bold"><i class="fas fa-hand-point-up text-3xl mb-3 block text-blue-400"></i>กรุณาเลือกฝ่ายจากเมนูด้านบนเพื่อแสดงข้อมูล</div>';
+      }
+
+      let filteredData = data;
+      if (currentView === 'result') {
+          if (currentSubTab === 'pending') filteredData = data.filter(r => !r['สถานะ'] || String(r['สถานะ']).trim() === '');
+          else if (currentSubTab === 'completed') filteredData = data.filter(r => r['สถานะ'] && String(r['สถานะ']).trim() !== '');
+      } else if (currentView === 'budgetAct') {
+          if (currentSubTab === 'pending') filteredData = data.filter(r => !r.isActual);
+          else if (currentSubTab === 'completed') filteredData = data.filter(r => r.isActual);
+      } else if (currentView === 'budgetReq') {
+          if (currentSubTab === 'pending') filteredData = []; 
+          else if (currentSubTab === 'completed' || currentSubTab === 'all') filteredData = data;
+      }
+
+      if (filteredData.length === 0 && data.length > 0) {
+          emptyMsg = `<div class="col-span-full text-center p-10 text-gray-400">ไม่มีข้อมูลในหมวดหมู่ <b>"${currentSubTab === 'pending' ? 'รอการป้อนข้อมูล' : 'ป้อนข้อมูลเสร็จแล้ว'}"</b></div>`;
+      }
+
+      let cardsHtml = filteredData.length ? filteredData.map((r, i) => {
+        let originalIndex = data.indexOf(r); 
+        let code = r['รหัส'] || r['รหัสแผน'] || '-';
+        let colsToDisplay = currentView === 'budgetAct' ? COLUMNS['budgetReq'] : COLUMNS[currentView];
+
+        let details = colsToDisplay.map(c => {
+          if (c === 'ID') return '';
+          let val = r[c] || '';
+          if(c === 'ลิงก์' && val) val = `<a href="${val}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline"><i class="fas fa-external-link-alt"></i> เปิดลิงก์</a>`;
+          else if(c === 'บรรลุผล') val = `<span class="px-2 py-1 ${parseFloat(val) >= 1 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'} rounded-full text-xs font-semibold">${val}</span>`;
+          else if(c === 'สถานะ') val = `<span class="font-bold ${val === 'สำเร็จ' ? 'text-green-600' : 'text-amber-500'}">${val}</span>`;
+          else if(['งบประมาณ', 'งบประมาณหลัก', 'จำนวนเงินที่ขอ', 'งบประมาณใช้จริง', 'งบประมาณคงเหลือ', 'งบประมาณที่ใช้', 'รายรับ'].includes(c)) val = `<span class="text-blue-700 font-medium">${formatNumber(val)}</span>`;
+          return `<div class="text-xs mb-1 border-b pb-1 flex justify-between"><span class="text-gray-500">${c}:</span> <span class="font-medium text-right">${val}</span></div>`;
+        }).join('');
+        
+        let printBtn = '';
+        if ((currentView === 'plan' || currentView === 'result') && (isUser || isAdmin)) {
+            if (currentView === 'plan' || (currentView === 'result' && r['สถานะ'])) {
+                printBtn = `<button onclick="downloadDoc(${originalIndex})" class="bg-emerald-500 text-white px-3 py-1 rounded text-xs font-bold mr-2 transition hover:bg-emerald-600"><i class="fas fa-print"></i> พิมพ์</button>`;
+            }
+        }
+        
+        let editBtn = '';
+        if (currentView === 'plan' && (currentUser.role === 'plan_officer' || isAdmin)) {
+            editBtn = `<button onclick="openModal(${originalIndex})" class="bg-amber-500 text-white px-3 py-1 rounded text-xs font-bold mr-2 transition hover:bg-amber-600"><i class="fas fa-edit"></i> แก้ไข</button>`;
+        } else if (currentView === 'result' && (currentUser.role === 'plan_officer' || isAdmin)) {
+            editBtn = `<button onclick="openModal(${originalIndex})" class="bg-amber-500 text-white px-3 py-1 rounded text-xs font-bold mr-2 transition hover:bg-amber-600"><i class="fas fa-edit"></i> ${r['สถานะ'] ? 'แก้ไข' : 'ป้อนผลลัพธ์'}</button>`;
+        } else if (currentView === 'budgetAct' && (currentUser.role === 'finance_officer' || isAdmin)) {
+            if (r.isActual) {
+                editBtn = `<button onclick="openModal(${originalIndex})" class="bg-amber-500 text-white px-3 py-1 rounded text-xs font-bold mr-2 transition hover:bg-amber-600"><i class="fas fa-edit"></i> แก้ไข</button>`;
+            } else {
+                editBtn = `<button onclick="openModal(${originalIndex})" class="bg-green-500 text-white px-3 py-1 rounded text-xs font-bold mr-2 transition hover:bg-green-600"><i class="fas fa-plus"></i> เพิ่มข้อมูลใช้จริง</button>`;
+            }
+        } else if (currentView === 'budgetReq' && (currentUser.role === 'plan_officer' || isAdmin)) {
+            editBtn = `<button onclick="openModal(${originalIndex})" class="bg-amber-500 text-white px-3 py-1 rounded text-xs font-bold mr-2 transition hover:bg-amber-600"><i class="fas fa-edit"></i> แก้ไข</button>`;
+        }
+        
+        let deleteBtn = '';
+        if (isAdmin && !(currentView === 'budgetAct' && !r.isActual)) {
+            deleteBtn = `<button onclick="deleteRow(${originalIndex})" class="bg-red-500 text-white px-3 py-1 rounded text-xs font-bold transition hover:bg-red-600"><i class="fas fa-trash"></i> ลบ</button>`;
+        }
+
+        let btnContainer = (printBtn || editBtn || deleteBtn) ? `<div class="flex justify-end mt-auto pt-3 border-t">${printBtn}${editBtn}${deleteBtn}</div>` : '';
+        let searchStr = (code + ' ' + (r['รายการ'] || '')).toLowerCase();
+
+        return `<div class="card-item bg-white rounded-xl shadow p-4 flex flex-col h-full hover:shadow-md transition" data-search="${searchStr}"><div onclick="this.nextElementSibling.classList.toggle('open')" class="cursor-pointer font-bold border-b pb-2 mb-2 text-blue-800 flex justify-between items-center truncate"><span>${code} : ${r['รายการ']||'-'}</span><i class="fas fa-chevron-down text-gray-300"></i></div><div class="card-details">${details}</div>${btnContainer}</div>`;
+      }).join('') : emptyMsg;
+
+      container.innerHTML = filterHtml + cardsHtml;
+
+      if (currentUser.role !== 'user' && ['plan', 'result'].includes(currentView)) {
+         let filterEl = document.getElementById('dataDeptFilter');
+         if (filterEl && window.lastSelectedDataDept) filterEl.value = window.lastSelectedDataDept;
+      }
+      if(previousSearch) handleSearch();
+    }
+
+    function renderPlanStatusTable(data) {
+        const container = document.getElementById('dataContainer');
+        container.className = 'col-span-full pb-10'; // Reset grid for table structure
+
+        let currentStatusFilter = window.lastSelectedPlanStatus || 'ALL';
+        let filteredData = data;
+        if (currentStatusFilter !== 'ALL') {
+            filteredData = data.filter(r => r.status === currentStatusFilter);
+        }
+
+        let filterHtml = '';
+        let searchBoxHtml = `<div class="flex items-center flex-1 w-full"><label class="mr-3 font-bold text-gray-700 whitespace-nowrap"><i class="fas fa-search text-gray-400"></i> ค้นหา:</label><input type="text" id="searchInput" onkeyup="handleSearchTable()" value="${window.lastSearchTerm || ''}" placeholder="พิมพ์รหัสแผน หรือ รายการ..." class="border p-2 rounded-lg flex-1 focus:outline-blue-500"></div>`;
+        
+        let statusFilterHtml = `
+            <div class="flex items-center flex-1 w-full">
+                <label class="mr-3 font-bold text-gray-700 whitespace-nowrap">สถานะ:</label>
+                <select id="statusFilter" onchange="window.lastSelectedPlanStatus=this.value; renderPlanStatusTable(tableData)" class="border p-2 rounded-lg w-full focus:outline-blue-500">
+                    <option value="ALL">เลือกทั้งหมด (All)</option>
+                    <option value="ยังไม่ได้ดำเนินการ">ยังไม่ได้ดำเนินการ</option>
+                    <option value="กำลังดำเนินการ">กำลังดำเนินการ</option>
+                    <option value="ดำเนินการแล้ว">ดำเนินการแล้ว</option>
+                </select>
+            </div>
+        `;
+
+        if (currentUser.role !== 'user') {
+            filterHtml = `
+            <div class="mb-4 p-4 bg-white rounded-xl shadow-sm flex flex-col xl:flex-row gap-4 items-center">
+                <div class="flex items-center flex-1 w-full">
+                    <label class="mr-3 font-bold text-gray-700 whitespace-nowrap">ฝ่าย:</label>
+                    <select id="dataDeptFilter" onchange="loadData()" class="border p-2 rounded-lg w-full focus:outline-blue-500">
+                        <option value="" disabled selected>-- เลือกฝ่าย --</option>
+                        <option value="ALL">รวมทั้งหมด (All Departments)</option>
+                        ${window.departmentOptionsHtml}
+                    </select>
+                </div>
+                ${statusFilterHtml}
+                ${searchBoxHtml}
+            </div>`;
+        } else {
+            filterHtml = `<div class="mb-4 p-4 bg-white rounded-xl shadow-sm flex flex-col md:flex-row gap-4 items-center">${statusFilterHtml}${searchBoxHtml}</div>`;
+        }
+
+        if (currentUser.role !== 'user' && !window.lastSelectedDataDept) {
+            container.innerHTML = filterHtml + `<div class="text-center p-10 text-gray-500 font-bold bg-white rounded-xl shadow"><i class="fas fa-hand-point-up text-3xl mb-3 block text-blue-400"></i>กรุณาเลือกฝ่ายจากเมนูด้านบนเพื่อแสดงข้อมูล</div>`;
+            if (document.getElementById('statusFilter')) document.getElementById('statusFilter').value = currentStatusFilter;
+            return;
+        }
+
+        let tableHtml = '';
+
+        if (filteredData.length === 0) {
+            tableHtml = `<div class="text-center p-10 text-gray-400 bg-white rounded-xl shadow">ไม่มีข้อมูลแผนในสถานะที่เลือก</div>`;
+        } else {
+            tableHtml = `
+            <div class="bg-white rounded-xl shadow overflow-hidden w-full">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-indigo-50 border-b text-indigo-800">
+                            <tr>
+                                <th class="p-4 font-bold">รหัส</th>
+                                <th class="p-4 font-bold">รายการ</th>
+                                <th class="p-4 font-bold">ฝ่าย</th>
+                                <th class="p-4 text-center font-bold">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredData.map((r) => {
+                                let searchStr = (r.id + ' ' + r.name).toLowerCase();
+                                let statusBadge = '';
+                                
+                                if (r.status === 'ยังไม่ได้ดำเนินการ') {
+                                    statusBadge = '<span class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold whitespace-nowrap"><i class="fas fa-circle text-[10px] mr-1"></i> ยังไม่ได้ดำเนินการ</span>';
+                                } else if (r.status === 'กำลังดำเนินการ') {
+                                    statusBadge = '<span class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold whitespace-nowrap"><i class="fas fa-spinner fa-spin text-[10px] mr-1"></i> กำลังดำเนินการ</span>';
+                                } else if (r.status === 'ดำเนินการแล้ว') {
+                                    statusBadge = '<span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold whitespace-nowrap"><i class="fas fa-check text-[10px] mr-1"></i> ดำเนินการแล้ว</span>';
+                                }
+
+                                return `
+                                <tr class="border-b hover:bg-gray-50 transition table-row-item" data-search="${searchStr}">
+                                    <td class="p-4 font-medium text-blue-700 whitespace-nowrap">${r.id}</td>
+                                    <td class="p-4 min-w-[200px] text-gray-800">${r.name || '-'}</td>
+                                    <td class="p-4 whitespace-nowrap text-gray-600">${r.dept || '-'}</td>
+                                    <td class="p-4 text-center">${statusBadge}</td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        container.innerHTML = filterHtml + tableHtml;
+        
+        if(window.lastSelectedDataDept && document.getElementById('dataDeptFilter')) document.getElementById('dataDeptFilter').value = window.lastSelectedDataDept;
+        if(document.getElementById('statusFilter')) document.getElementById('statusFilter').value = currentStatusFilter;
+        if(window.lastSearchTerm) handleSearchTable();
+    }
+
+    function renderResultTable(data, isHistory) {
+        const container = document.getElementById('dataContainer');
+        container.className = 'col-span-full pb-10'; 
+
+        let filteredData = data;
+        if (!isHistory) {
+            filteredData = data.filter(r => r['ได้รับเอกสาร'] !== 'ได้รับแล้ว' && r['สถานะ']); 
+        } else {
+            filteredData = data.filter(r => r['ได้รับเอกสาร'] === 'ได้รับแล้ว');
+        }
+
+        let filterHtml = `
+         <div class="mb-4 p-4 bg-white rounded-xl shadow-sm flex flex-col md:flex-row gap-4 items-center">
+            <div class="flex items-center flex-1 w-full">
+                <label class="mr-3 font-bold text-gray-700 whitespace-nowrap">เลือกดูข้อมูลฝ่าย:</label>
+                <select id="dataDeptFilter" onchange="loadData()" class="border p-2 rounded-lg flex-1 focus:outline-blue-500">
+                   <option value="" disabled selected>-- กรุณาเลือกฝ่ายเพื่อแสดงข้อมูล --</option>
+                   <option value="ALL">รวมทั้งหมด (All Departments)</option>
+                   ${window.departmentOptionsHtml}
+                </select>
+            </div>
+            <div class="flex items-center flex-1 w-full">
+                <label class="mr-3 font-bold text-gray-700 whitespace-nowrap"><i class="fas fa-search text-gray-400"></i> ค้นหา:</label>
+                <input type="text" id="searchInput" onkeyup="handleSearchTable()" placeholder="พิมพ์รหัสแผน หรือ รายการ..." class="border p-2 rounded-lg flex-1 focus:outline-blue-500">
+            </div>
+         </div>`;
+
+        let emptyMsg = `<div class="text-center p-10 text-gray-500 font-bold bg-white rounded-xl shadow"><i class="fas fa-hand-point-up text-3xl mb-3 block text-blue-400"></i>กรุณาเลือกฝ่ายจากเมนูด้านบนเพื่อแสดงข้อมูล</div>`;
+        
+        if (window.lastSelectedDataDept && filteredData.length === 0) {
+            emptyMsg = `<div class="text-center p-10 text-gray-400 bg-white rounded-xl shadow">ไม่มีข้อมูลเอกสารในหมวดหมู่นี้</div>`;
+        }
+
+        if (!window.lastSelectedDataDept || filteredData.length === 0) {
+            container.innerHTML = filterHtml + emptyMsg;
+            if(window.lastSelectedDataDept) document.getElementById('dataDeptFilter').value = window.lastSelectedDataDept;
+            return;
+        }
+
+        let tableHtml = `
+        <div class="bg-white rounded-xl shadow overflow-hidden w-full">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-indigo-50 border-b text-indigo-800">
+                        <tr>
+                            <th class="p-4 font-bold">รหัส</th>
+                            <th class="p-4 font-bold">รายการ</th>
+                            <th class="p-4 font-bold">ฝ่าย</th>
+                            <th class="p-4 text-center font-bold">สถานะ</th>
+                            ${!isHistory ? '<th class="p-4 text-center font-bold">รับเอกสาร</th>' : '<th class="p-4 text-center font-bold">สถานะเอกสาร</th>'}
+                            <th class="p-4 text-center font-bold">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredData.map((r) => {
+                            let originalIndex = data.indexOf(r);
+                            let code = r['รหัส'] || r['รหัสแผน'] || '-';
+                            let searchStr = (code + ' ' + (r['รายการ'] || '')).toLowerCase();
+                            
+                            let actionBtn = '';
+                            if (!isHistory) {
+                                actionBtn = `<button onclick="markReceived(${r.rowNumber})" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm whitespace-nowrap"><i class="fas fa-check-square mr-1"></i> ติ๊กรับเอกสาร</button>`;
+                            } else {
+                                actionBtn = `<span class="text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i> ได้รับแล้ว</span>`;
+                            }
+
+                            return `
+                            <tr class="border-b hover:bg-gray-50 transition table-row-item" data-search="${searchStr}">
+                                <td class="p-4 font-medium text-blue-700 whitespace-nowrap">${code}</td>
+                                <td class="p-4 min-w-[200px]">${r['รายการ'] || '-'}</td>
+                                <td class="p-4 whitespace-nowrap text-gray-600">${r['ฝ่าย'] || '-'}</td>
+                                <td class="p-4 text-center whitespace-nowrap"><span class="font-bold ${r['สถานะ'] === 'สำเร็จ' ? 'text-green-600' : 'text-amber-500'}">${r['สถานะ'] || '-'}</span></td>
+                                <td class="p-4 text-center">${actionBtn}</td>
+                                <td class="p-4 text-center whitespace-nowrap">
+                                    <button onclick="openModal(${originalIndex})" class="text-amber-500 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 p-2 rounded-full transition mr-1" title="แก้ไข"><i class="fas fa-edit"></i></button>
+                                    <button onclick="deleteRow(${originalIndex})" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-full transition" title="ลบ"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+
+        container.innerHTML = filterHtml + tableHtml;
+        if(window.lastSelectedDataDept) document.getElementById('dataDeptFilter').value = window.lastSelectedDataDept;
+    }
+
+    function renderBudgetSummaryTable(data) {
+        const container = document.getElementById('dataContainer');
+        container.className = 'col-span-full pb-10';
+
+        let filterHtml = '';
+        let searchBoxHtml = `<div class="flex items-center flex-1 w-full"><label class="mr-3 font-bold text-gray-700 whitespace-nowrap"><i class="fas fa-search text-gray-400"></i> ค้นหา:</label><input type="text" id="searchInput" onkeyup="handleSearchTable()" value="${window.lastSearchTerm || ''}" placeholder="พิมพ์รหัสแผน หรือ รายการ..." class="border p-2 rounded-lg flex-1 focus:outline-blue-500"></div>`;
+
+        if (currentUser.role !== 'user') {
+            filterHtml = `
+            <div class="mb-4 p-4 bg-white rounded-xl shadow-sm flex flex-col md:flex-row gap-4 items-center">
+                <div class="flex items-center flex-1 w-full">
+                    <label class="mr-3 font-bold text-gray-700 whitespace-nowrap">ฝ่าย:</label>
+                    <select id="dataDeptFilter" onchange="loadData()" class="border p-2 rounded-lg w-full focus:outline-blue-500">
+                        <option value="" disabled selected>-- เลือกฝ่าย --</option>
+                        <option value="ALL">รวมทั้งหมด (All Departments)</option>
+                        ${window.departmentOptionsHtml}
+                    </select>
+                </div>
+                ${searchBoxHtml}
+            </div>`;
+        } else {
+            filterHtml = `<div class="mb-4 p-4 bg-white rounded-xl shadow-sm flex items-center">${searchBoxHtml}</div>`;
+        }
+
+        if (currentUser.role !== 'user' && !window.lastSelectedDataDept) {
+            container.innerHTML = filterHtml + `<div class="text-center p-10 text-gray-500 font-bold bg-white rounded-xl shadow"><i class="fas fa-hand-point-up text-3xl mb-3 block text-blue-400"></i>กรุณาเลือกฝ่ายจากเมนูด้านบนเพื่อแสดงข้อมูล</div>`;
+            return;
+        }
+
+        let tableHtml = '';
+        if (data.length === 0) {
+            tableHtml = `<div class="text-center p-10 text-gray-400 bg-white rounded-xl shadow">ไม่มีข้อมูลสรุปงบประมาณ</div>`;
+        } else {
+            tableHtml = `
+            <div class="bg-white rounded-xl shadow overflow-hidden w-full">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-indigo-50 border-b text-indigo-800">
+                            <tr>
+                                <th class="p-4 font-bold">รหัส</th>
+                                <th class="p-4 font-bold">รายการ</th>
+                                <th class="p-4 font-bold text-right">งบประมาณ</th>
+                                <th class="p-4 font-bold text-right text-yellow-700">งบที่ขอล่าสุด</th>
+                                <th class="p-4 font-bold text-right text-green-700">คงเหลือ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(r => {
+                                let searchStr = (r.id + ' ' + r.name).toLowerCase();
+                                return `
+                                <tr class="border-b hover:bg-gray-50 transition table-row-item" data-search="${searchStr}">
+                                    <td class="p-4 font-medium text-blue-700 whitespace-nowrap">${r.id}</td>
+                                    <td class="p-4 min-w-[200px] text-gray-800">${r.name}</td>
+                                    <td class="p-4 text-right font-medium text-gray-700">${formatNumber(r.budget)}</td>
+                                    <td class="p-4 text-right font-medium text-yellow-600">${formatNumber(r.latestReq)}</td>
+                                    <td class="p-4 text-right font-bold text-green-600">${formatNumber(r.remaining)}</td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        container.innerHTML = filterHtml + tableHtml;
+        if(window.lastSelectedDataDept && document.getElementById('dataDeptFilter')) document.getElementById('dataDeptFilter').value = window.lastSelectedDataDept;
+        if(window.lastSearchTerm) handleSearchTable();
+    }
+
+    function handleSearchTable() {
+        let input = document.getElementById('searchInput');
+        if(!input) return;
+        let term = input.value.toLowerCase().trim();
+        window.lastSearchTerm = term;
+        let rows = document.querySelectorAll('.table-row-item');
+        
+        rows.forEach(row => {
+            let searchData = row.getAttribute('data-search') || '';
+            row.style.display = searchData.includes(term) ? '' : 'none'; 
+        });
+    }
+
+    function handleSearch() {
+        let input = document.getElementById('searchInput');
+        if(!input) return;
+        let term = input.value.toLowerCase().trim();
+        let cards = document.querySelectorAll('.card-item');
+        cards.forEach(card => {
+            let searchData = card.getAttribute('data-search') || '';
+            card.style.display = searchData.includes(term) ? '' : 'none'; 
+        });
+    }
+
+    function openModal(idx = -1) {
+      editingRow = idx >= 0 ? tableData[idx] : null;
+      let isFinanceAdding = (currentView === 'budgetAct' && editingRow && !editingRow.isActual);
+      
+      document.getElementById('modalTitle').innerText = isFinanceAdding ? 'บันทึกงบประมาณใช้จริง' : (editingRow ? 'แก้ไขข้อมูล' : 'เพิ่มข้อมูลใหม่');
+      const form = document.getElementById('crudForm');
+      form.innerHTML = '';
+      
+      let isUserPlan = (currentUser.role === 'user' && currentView === 'plan');
+      let date = new Date();
+      let todayStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+
+      let viewType = (currentView === 'checkResult' || currentView === 'historyResult') ? 'result' : currentView;
+
+      COLUMNS[viewType].forEach(col => {
+        let val = editingRow ? (editingRow[col] || '') : '';
+        
+        if (col === 'วันที่บันทึก') {
+            if (!editingRow || currentView === 'budgetAct' || !val) {
+                val = todayStr;
+            } else if (val && val.toString().includes('/')) {
+                let p = val.toString().split('/');
+                if (p.length === 3) {
+                    let y = parseInt(p[2]);
+                    if (y > 2500) y -= 543;
+                    val = `${y}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+                }
+            }
+        }
+
+        if (col === 'ID') { form.innerHTML += `<input type="hidden" id="f_${col}" value="${val}">`; return; }
+        
+        let readOnly = '';
+        if (!isUserPlan) {
+            if (col === 'งบประมาณคงเหลือ' || (currentView.startsWith('budget') && (col === 'รายการ' || col === 'งบประมาณหลัก'))) {
+                readOnly = 'readonly bg-gray-100';
+            }
+            if (viewType === 'result' && ['รายการ', 'ผู้รับผิดชอบ', 'เป้าหมาย', 'งบประมาณ', 'มาตรฐานที่', 'ตัวชี้วัดที่', 'ภารกิจที่', 'ร้อยละ', 'บรรลุผล', 'สถานะ'].includes(col)) {
+                readOnly = 'readonly bg-gray-100';
+            }
+            if (currentView === 'budgetReq' && ['รายการ', 'งบประมาณหลัก', 'งบประมาณคงเหลือ'].includes(col)) {
+                readOnly = 'readonly bg-gray-100';
+            }
+            if (currentView === 'budgetAct' && ['รหัสแผน', 'รายการ', 'งบประมาณหลัก', 'จำนวนเงินที่ขอ', 'งบประมาณคงเหลือ'].includes(col)) {
+                readOnly = 'readonly bg-gray-100';
+            }
+        }
+        
+        if (['ผลการดำเนินงาน', 'วัตถุประสงค์', 'การประเมินผล', 'ผลลัพธ์', 'เป้าหมาย'].includes(col)) {
+            form.innerHTML += `<div class="mb-3 md:col-span-2"><label class="block text-xs font-bold text-gray-600 mb-1">${col}</label><textarea id="f_${col}" rows="3" ${readOnly} class="w-full p-2 border rounded text-sm focus:outline-blue-500 ${readOnly}">${val}</textarea></div>`;
+        } else {
+            let inputType = 'text', inputMode = '', eventHandlers = '';
+            let isMoney = ['งบประมาณ', 'งบประมาณหลัก', 'จำนวนเงินที่ขอ', 'งบประมาณใช้จริง', 'งบประมาณคงเหลือ', 'งบประมาณที่ใช้', 'รายรับ', 'ผลลัพธ์จริงเชิงปริมาณ', 'จำนวนเต็มของเป้าหมาย', 'จำนวนเต็ม', 'ร้อยละ'].includes(col);
+            
+            if (isMoney) {
+                inputType = 'text'; inputMode = 'inputmode="decimal"';
+            } else if (col === 'วันที่บันทึก') {
+                inputType = 'date';
+            }
+            
+            if (isMoney && val !== '') {
+                val = formatNumber(val.toString().replace(/,/g, ''));
+                eventHandlers = `onfocus="this.value = this.value.replace(/,/g, '')" onblur="if(this.value) this.value = formatNumber(this.value)"`;
+            }
+            let safeVal = String(val).replace(/"/g, '&quot;');
+            form.innerHTML += `<div class="mb-3"><label class="block text-xs font-bold text-gray-600 mb-1">${col}</label><input type="${inputType}" ${inputMode} id="f_${col}" value="${safeVal}" ${readOnly} ${eventHandlers} class="w-full p-2 border rounded text-sm focus:outline-blue-500 ${readOnly}"></div>`;
+        }
+      });
+      document.getElementById('crudModal').classList.remove('hidden');
+
+      const targetInputId = viewType === 'result' ? 'f_รหัส' : 'f_รหัสแผน';
+      const targetInput = document.getElementById(targetInputId);
+      
+      if(targetInput && !editingRow) {
+        targetInput.addEventListener('blur', e => {
+          if(!e.target.value) return;
+          google.script.run
+          .withFailureHandler(err => console.error('Plan not found:', err))
+          .withSuccessHandler(p => {
+            if(p) {
+              if(currentView === 'budgetReq') {
+                 document.getElementById('f_รายการ').value = p['รายการ'] || '';
+                 let latestBudget = p['งบประมาณคงเหลือล่าสุด'] !== undefined ? p['งบประมาณคงเหลือล่าสุด'] : p['งบประมาณ'];
+                 document.getElementById('f_งบประมาณหลัก').value = formatNumber(latestBudget || 0);
+                 const reqInput = document.getElementById('f_จำนวนเงินที่ขอ');
+                 let reqAmt = reqInput ? (parseFloat(reqInput.value.replace(/,/g, '')) || 0) : 0;
+                 document.getElementById('f_งบประมาณคงเหลือ').value = formatNumber((parseFloat(latestBudget||0) - reqAmt));
+              }
+              if(viewType === 'result') {
+                 ['รายการ', 'ผู้รับผิดชอบ', 'เป้าหมาย', 'มาตรฐานที่', 'ตัวชี้วัดที่'].forEach(k => { if(document.getElementById(`f_${k}`)) document.getElementById(`f_${k}`).value = p[k] || ''; });
+                 if (document.getElementById('f_งบประมาณ')) document.getElementById('f_งบประมาณ').value = formatNumber(p['งบประมาณ'] || 0);
+                 if (document.getElementById('f_ภารกิจที่')) document.getElementById('f_ภารกิจที่').value = p['ภารกิจที่'] || p['ภาระกิจที่'] || '';
+              }
+            } else {
+               Swal.fire('Error', 'ไม่พบรหัสแผนนี้ในระบบ', 'warning');
+            }
+          }).getPlanById(e.target.value);
+        });
+      }
+
+      if (currentView === 'budgetReq' || currentView === 'budgetAct') {
+        const mInput = document.getElementById('f_งบประมาณหลัก'), actOrReqInput = document.getElementById(currentView === 'budgetReq' ? 'f_จำนวนเงินที่ขอ' : 'f_งบประมาณใช้จริง'), remainInput = document.getElementById('f_งบประมาณคงเหลือ');
+        if (mInput && actOrReqInput && remainInput) {
+            const calcRemain = () => { remainInput.value = formatNumber((parseFloat(mInput.value.replace(/,/g, '')) || 0) - (parseFloat(actOrReqInput.value.replace(/,/g, '')) || 0)); };
+            mInput.addEventListener('input', calcRemain); actOrReqInput.addEventListener('input', calcRemain);
+        }
+      }
+
+      if (viewType === 'result') {
+        const aInput = document.getElementById('f_ผลลัพธ์จริงเชิงปริมาณ'), tInput = document.getElementById('f_จำนวนเต็ม'), tsInput = document.getElementById('f_จำนวนเต็มของเป้าหมาย');
+        const pInput = document.getElementById('f_ร้อยละ'), acInput = document.getElementById('f_บรรลุผล'), sInput = document.getElementById('f_สถานะ');
+
+        const calcResult = () => {
+            const a = parseFloat(aInput.value.replace(/,/g, '')) || 0, t = parseFloat(tInput.value.replace(/,/g, '')) || 0, ts = parseFloat(tsInput.value.replace(/,/g, '')) || 0;
+            let percent = t > 0 ? (a * 100) / t : 0;
+            if (pInput) pInput.value = t > 0 ? formatNumber(percent.toFixed(2)) : '';
+            
+            if (ts > 0 && t > 0) {
+                if (acInput) acInput.value = (percent >= ts) ? '1' : '0';
+                if (sInput) sInput.value = (percent >= ts) ? 'สำเร็จ' : 'ปรับปรุง';
+            } else {
+                if (acInput) acInput.value = ''; if (sInput) sInput.value = '';
+            }
+        };
+
+        if (aInput && tInput && tsInput) {
+            aInput.addEventListener('input', calcResult); tInput.addEventListener('input', calcResult); tsInput.addEventListener('input', calcResult);
+        }
+      }
+    }
+
+    function closeModal() { document.getElementById('crudModal').classList.add('hidden'); }
+
+    async function saveFormData() {
+      let dataObj = {};
+      let viewType = (currentView === 'checkResult' || currentView === 'historyResult') ? 'result' : currentView;
+
+      COLUMNS[viewType].forEach(c => {
+          let el = document.getElementById(`f_${c}`);
+          if (el) {
+              let val = el.value;
+              if (c === 'วันที่บันทึก' && val) {
+                  let p = val.split('-');
+                  if (p.length === 3) val = `${p[2]}/${p[1]}/${parseInt(p[0]) + 543}`;
+              }
+              if (['งบประมาณ', 'งบประมาณหลัก', 'จำนวนเงินที่ขอ', 'งบประมาณใช้จริง', 'งบประมาณคงเหลือ', 'งบประมาณที่ใช้', 'รายรับ', 'ผลลัพธ์จริงเชิงปริมาณ', 'จำนวนเต็มของเป้าหมาย', 'จำนวนเต็ม', 'ร้อยละ'].includes(c)) {
+                  val = parseFloat(val.toString().replace(/,/g, '')) || 0;
+              }
+              dataObj[c] = val;
+          }
+      });
+      
+      if (currentView === 'budgetReq' && !editingRow) {
+          dataObj['ID'] = 'B-' + Date.now();
+      } else if (currentView === 'budgetAct') {
+          dataObj['ID'] = (editingRow && editingRow['ID']) ? editingRow['ID'] : 'A-' + Date.now(); 
+      }
+      
+      if (viewType === 'result') {
+          let a = parseFloat(dataObj['ผลลัพธ์จริงเชิงปริมาณ']) || 0, t = parseFloat(dataObj['จำนวนเต็ม']) || 0, ts = parseFloat(dataObj['จำนวนเต็มของเป้าหมาย']) || 0;
+          let percent = t > 0 ? (a * 100) / t : 0;
+          dataObj['ร้อยละ'] = percent;
+          if (ts > 0 && t > 0) {
+              dataObj['บรรลุผล'] = (percent >= ts) ? 1 : 0;
+              dataObj['สถานะ'] = (percent >= ts) ? 'สำเร็จ' : 'ปรับปรุง';
+          }
+      }
+
+      showLoading('กำลังบันทึก...');
+      let sheetToSave = currentView === 'plan' ? 'Plan' : 'Result';
+      
+      if (currentView.startsWith('budget')) {
+          let type = currentView === 'budgetReq' ? 'req' : 'act';
+          let rowNum = editingRow?.rowNumber;
+          if (currentView === 'budgetAct') rowNum = (editingRow && editingRow.isActual) ? editingRow.actRowNumber : null;
+          
+          google.script.run
+          .withFailureHandler(handleServerError)
+          .withSuccessHandler(res => {
+            if(res.status==='success') { Swal.fire({icon:'success', title:'สำเร็จ', timer:1000, showConfirmButton:false}); loadData(); closeModal(); }
+            else Swal.fire('Error', res.message, 'error');
+          }).saveBudgetRecord(type, dataObj, rowNum);
+      } else {
+          let rowNum = editingRow?.rowNumber;
+          google.script.run
+          .withFailureHandler(handleServerError)
+          .withSuccessHandler(res => {
+            if(res.status==='success') { Swal.fire({icon:'success', title:'สำเร็จ', timer:1000, showConfirmButton:false}); loadData(); closeModal(); }
+            else Swal.fire('Error', res.message, 'error');
+          }).saveData(sheetToSave, dataObj, rowNum);
+      }
+    }
+
+    async function deleteRow(idx) {
+      const row = tableData[idx];
+      const res = await Swal.fire({ title: 'ยืนยันการลบ?', text: 'ข้อมูลจะถูกลบและไม่สามารถกู้คืนได้', icon: 'warning', showCancelButton: true, confirmButtonText: 'ยืนยัน ลบเลย', cancelButtonText: 'ยกเลิก' });
+      if(res.isConfirmed) {
+        showLoading('กำลังลบ...');
+        let sheet = 'Result';
+        if (currentView === 'plan') sheet = 'Plan';
+        else if (currentView === 'budgetReq') sheet = 'BudgetReq';
+        else if (currentView === 'budgetAct') sheet = 'BudgetActual';
+        
+        let rowNum = row.rowNumber;
+        if (currentView === 'budgetAct') rowNum = row.actRowNumber;
+
+        google.script.run
+        .withFailureHandler(handleServerError)
+        .withSuccessHandler(() => { 
+          Swal.fire({icon:'success', title:'ลบเรียบร้อย', timer:1000, showConfirmButton:false}); loadData(); 
+        }).deleteData(sheet, rowNum);
+      }
+    }
+
+    function markReceived(rowNum) {
+        Swal.fire({
+            title: 'ยืนยันการรับเอกสาร?',
+            text: "โปรดคลิกยืนยันเมื่อได้รับเอกสารรูปเล่มผลลัพธ์ตัวจริงแล้ว",
+            icon: 'question', showCancelButton: true, confirmButtonText: '<i class="fas fa-check"></i> ยืนยันรับเอกสาร', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#3b82f6'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                showLoading('กำลังบันทึกข้อมูล...');
+                google.script.run
+                .withFailureHandler(handleServerError)
+                .withSuccessHandler(res => {
+                    if (res.status === 'success') {
+                        Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ', timer: 1500, showConfirmButton: false }); loadData(); 
+                    } else { Swal.fire('Error', res.message, 'error'); }
+                }).markResultReceived(rowNum);
+            }
+        });
+    }
+
+    function logout() { 
+      Swal.fire({ title: 'ยืนยันการออกจากระบบ?', icon: 'question', showCancelButton: true, confirmButtonText: 'ออกจากระบบ', cancelButtonText: 'ยกเลิก' }).then(res => {
+        if(res.isConfirmed) {
+           currentUser = null; tableData = []; editingRow = null; currentView = 'dashboard';
+           window.lastSelectedDept = ''; window.lastSelectedDataDept = ''; window.lastSelectedPlan = '';
+           
+           document.getElementById('appScreen').classList.add('hidden');
+           document.getElementById('loginScreen').classList.remove('hidden');
+           document.getElementById('specialMenu').classList.add('hidden');
+           
+           // นำ 'planStatus' ออกจาก array นี้ เพื่อไม่ให้มันถูกซ่อนเมื่อ logout
+           ['budgetReq', 'budgetAct', 'checkResult', 'historyResult'].forEach(id => {
+               const el = document.getElementById(`menu-${id}`);
+               if(el) el.classList.replace('block', 'hidden');
+           });
+           
+           document.getElementById('loginForm').reset();
+           Swal.fire({ icon: 'success', title: 'ออกจากระบบแล้ว', timer: 1000, showConfirmButton: false });
+        }
+      });
+    }
+
+    function downloadDoc(index) {
+      showLoading('กำลังสร้างเอกสารสำหรับพิมพ์...');
+      setTimeout(() => {
+        const row = tableData[index];
+        const dateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+        const formatText = (text) => (text || '').toString().replace(/\n/g, '<br>');
+        let htmlContent = '';
+
+        if (currentView === 'plan') {
+          htmlContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset="utf-8"><style>@page { size: 21cm 29.7cm; margin: 1.5cm; } body { font-family: 'TH Sarabun New', 'TH Sarabun PS', serif; font-size: 16pt; line-height: 1.15; } table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1pt solid black; } td { border: 1pt solid black; padding: 8px; vertical-align: top; } .text-center { text-align: center; } .font-bold { font-weight: bold; } .header-title { font-size: 18pt; font-weight: bold; }</style></head><body><div class="text-center header-title">แบบขออนุมัติดำเนินการโครงการ/กิจกรรม/งาน</div><div class="text-center header-title">วิทยาลัยเทคโนโลยีวีระพัฒน์</div><br><table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; width: 100%; border: 1pt solid black;"><tr><td colspan="4" style="width: 60%; border: 1pt solid black;"><span class="font-bold">เรื่อง</span> ขออนุมัติดำเนินการตามแผน</td><td colspan="2" style="width: 40%; border: 1pt solid black;"><span class="font-bold">วันที่</span> ${dateStr}</td></tr><tr><td colspan="4" style="border: 1pt solid black;"><span class="font-bold">เรียน</span> ผู้อำนวยการ</td><td colspan="2" style="border: 1pt solid black;"><span class="font-bold">จาก</span> ${row['ผู้รับผิดชอบ'] || '-'}</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">ด้วย แผนก/ฝ่าย</span> ${row['ฝ่าย'] || '-'} ขออนุมัติดำเนินการตามแผนดังนี้</td></tr><tr><td colspan="2" style="border: 1pt solid black;"><span class="font-bold">รหัสแผน</span> ${row['รหัส'] || '-'}</td><td colspan="4" style="border: 1pt solid black;"><span class="font-bold">โครงการ/กิจกรรม/งาน</span> ${row['รายการ'] || '-'}</td></tr><tr><td style="width: 15%; border: 1pt solid black;"><span class="font-bold">มาตรฐานที่</span></td><td style="width: 18%; border: 1pt solid black;">${row['มาตรฐานที่'] || '-'}</td><td style="width: 15%; border: 1pt solid black;"><span class="font-bold">ตัวชี้วัดที่</span></td><td style="width: 18%; border: 1pt solid black;">${row['ตัวชี้วัดที่'] || '-'}</td><td style="width: 15%; border: 1pt solid black;"><span class="font-bold">ภารกิจที่</span></td><td style="width: 19%; border: 1pt solid black;">${row['ภารกิจที่'] || row['ภาระกิจที่'] || '-'}</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">วัตถุประสงค์</span><br>${formatText(row['วัตถุประสงค์'])}</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">เป้าหมาย</span>${formatText(row['เป้าหมาย'])}</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">ผลที่คาดว่าจะได้รับ</span>${formatText(row['ผลลัพธ์'])}</td></tr><tr><td colspan="3" style="border: 1pt solid black;"><span class="font-bold">สถานที่ </span>${formatText(row['สถานที่'])}</td><td colspan="3" style="border: 1pt solid black;"><span class="font-bold">ระยะเวลา </span>${formatText(row['ระยะเวลา'])}</td></tr><tr><td colspan="2" style="border: 1pt solid black;"><span class="font-bold">งบประมาณ</span> ${formatNumber(row['งบประมาณ'])} บาท</td><td colspan="4" style="border: 1pt solid black;">(&nbsp;&nbsp;&nbsp;) มีเอกสารแนบ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&nbsp;&nbsp;&nbsp;) ไม่มีเอกสารแนบ</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">วิธีการประเมินผล </span>${formatText(row['การประเมินผล'])}</td></tr><tr><td class="text-center" style="height: 120px; border: 1pt solid black; vertical-align: middle;" colspan="2"><span class="font-bold">ผู้รับผิดชอบ</span><br><br>${row['ผู้รับผิดชอบ'] || '..........................................'}</td><td class="text-center" style="border: 1pt solid black; vertical-align: middle;" colspan="2"><span class="font-bold">หัวหน้าแผนก</span><br><br>(......................................)</td><td class="text-center" style="border: 1pt solid black; vertical-align: middle;" colspan="2"><span class="font-bold">หัวหน้าฝ่าย</span><br><br>(......................................)</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">ความเห็นผู้อำนวยการ</span><br>(&nbsp;&nbsp;&nbsp;) อนุมัติ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&nbsp;&nbsp;&nbsp;) ไม่อนุมัติ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&nbsp;&nbsp;&nbsp;) อื่นๆ ............................................................<br><div style="text-align: right;">............................................................<br>(นางผจงกร ศรีไพโรจน์)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div></td></tr></table></body></html>`;
+        } else if (currentView === 'result') {
+          htmlContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset="utf-8"><style>@page { size: 21cm 29.7cm; margin: 1.5cm; } body { font-family: 'TH Sarabun New', 'TH Sarabun PS', serif; font-size: 16pt; line-height: 1.15; } table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1pt solid black; } td { border: 1pt solid black; padding: 8px; vertical-align: top; } .text-center { text-align: center; } .font-bold { font-weight: bold; } .header-title { font-size: 18pt; font-weight: bold; }</style></head><body><div class="text-center header-title">แบบรายงานผลการดำเนินงานโครงการ/กิจกรรม/งาน</div><div class="text-center header-title">วิทยาลัยเทคโนโลยีวีระพัฒน์</div><br><table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; width: 100%; border: 1pt solid black;"><tr><td colspan="4" style="width: 60%; border: 1pt solid black;"><span class="font-bold">เรื่อง</span> ขอรายงานผลการดำเนินงานตามแผน</td><td colspan="2" style="width: 40%; border: 1pt solid black;"><span class="font-bold">วันที่</span> ${dateStr}</td></tr><tr><td colspan="4" style="border: 1pt solid black;"><span class="font-bold">เรียน</span> ผู้อำนวยการ</td><td colspan="2" style="border: 1pt solid black;"><span class="font-bold">จาก</span> ${row['ผู้รับผิดชอบ'] || '-'}</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">ด้วย แผนก/ฝ่าย</span> ${row['ฝ่าย'] || '-'} ขอรายงานผลการดำเนินการตามแผนดังนี้</td></tr><tr><td colspan="2" style="border: 1pt solid black;"><span class="font-bold">รหัสแผน</span> ${row['รหัส'] || '-'}</td><td colspan="4" style="border: 1pt solid black;"><span class="font-bold">โครงการ/กิจกรรม/งาน</span> ${row['รายการ'] || '-'}</td></tr><tr><td style="width: 15%; border: 1pt solid black;"><span class="font-bold">มาตรฐานที่</span></td><td style="width: 18%; border: 1pt solid black;">${row['มาตรฐานที่'] || '-'}</td><td style="width: 15%; border: 1pt solid black;"><span class="font-bold">ตัวชี้วัดที่</span></td><td style="width: 18%; border: 1pt solid black;">${row['ตัวชี้วัดที่'] || '-'}</td><td style="width: 15%; border: 1pt solid black;"><span class="font-bold">ภารกิจที่</span></td><td style="width: 19%; border: 1pt solid black;">${row['ภารกิจที่'] || row['ภาระกิจที่'] || '-'}</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">ผลการดำเนินงาน </span><br>${formatText(row['ผลการดำเนินงาน'])}</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">เป้าหมาย </span>${formatText(row['เป้าหมาย'])}</td></tr><tr><td colspan="3" style="width: 50%; border: 1pt solid black;"><span class="font-bold">จำนวนเต็มของเป้าหมาย </span>${formatText(row['จำนวนเต็มของเป้าหมาย'])}</td><td colspan="3" style="width: 50%; border: 1pt solid black;"><span class="font-bold">จำนวนเต็ม (ยอดรวม) </span>${formatText(row['จำนวนเต็ม'])}</td></tr><tr><td colspan="3" style="border: 1pt solid black;"><span class="font-bold">ผลลัพธ์จริงเชิงปริมาณ </span>${formatText(row['ผลลัพธ์จริงเชิงปริมาณ'])}</td><td colspan="3" style="border: 1pt solid black;"><span class="font-bold">คิดเป็นร้อยละ </span>${formatText(row['ร้อยละ'])} %</td></tr><tr><td colspan="3" style="border: 1pt solid black;"><span class="font-bold">คะแนนบรรลุผล (1=ผ่าน) </span>${formatText(row['บรรลุผล'])}</td><td colspan="3" style="border: 1pt solid black;"><span class="font-bold">ผลการดำเนินงาน (สถานะ) </span>${formatText(row['สถานะ'])}</td></tr><tr><td colspan="3" style="border: 1pt solid black;"><span class="font-bold">งบประมาณที่ขอ </span>${formatNumber(row['งบประมาณ'])} บาท</td><td colspan="3" style="border: 1pt solid black;"><span class="font-bold">งบประมาณที่ใช้ </span>${formatNumber(row['งบประมาณที่ใช้'])} บาท</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">ลิงก์หลักฐาน</span><br>${formatText(row['ลิงก์'])}</td></tr><tr><td colspan="2" class="text-center" style="height: 120px; border: 1pt solid black; vertical-align: middle;"><span class="font-bold">ผู้รับผิดชอบ</span><br><br>${row['ผู้รับผิดชอบ'] || '..........................................'}</td><td colspan="2" class="text-center" style="border: 1pt solid black; vertical-align: middle;"><span class="font-bold">หัวหน้าแผนก</span><br><br>(..........................................)</td><td colspan="2" class="text-center" style="border: 1pt solid black; vertical-align: middle;"><span class="font-bold">หัวหน้าฝ่าย</span><br><br>(..........................................)</td></tr><tr><td colspan="6" style="border: 1pt solid black;"><span class="font-bold">ความเห็นผู้อำนวยการ</span><br>(&nbsp;&nbsp;&nbsp;) ทราบ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&nbsp;&nbsp;&nbsp;) ให้แก้ไขดังนี้ ........................................................................................<br><div style="text-align: right;">............................................................<br>(นางผจงกร ศรีไพโรจน์)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div></td></tr></table></body></html>`;
+        }
+          
+        const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a'); link.href = url;
+        let fileNamePrefix = currentView === 'plan' ? 'อนุมัติแผน' : 'รายงานผล';
+        link.download = `${fileNamePrefix}_${row['รหัส'] || 'เอกสาร'}.doc`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        Swal.fire({ icon: 'success', title: 'สร้างเอกสารสำหรับพิมพ์สำเร็จ', timer: 1500, showConfirmButton: false });
+      }, 500);
+    }
+  </script>
+</body>
+</html>
